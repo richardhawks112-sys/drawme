@@ -6,6 +6,8 @@ import { floodFill, growRegion, regionToCanvas } from './fill.js';
 import { ICONS } from './icons.js';
 import { LayersPanel } from './layers-panel.js';
 import * as storage from './storage.js';
+import { Reference, blobToCanvas, canvasSizeFor, findImageIn, loadImageFromUrl } from './reference.js';
+import { ImageSearch } from './search.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -123,6 +125,7 @@ function setDocument(doc) {
   restoring = false;
   view.setDocument(doc);
   refreshLayers();
+  refreshReference();
 }
 
 function refreshLayers() {
@@ -145,6 +148,7 @@ history.addEventListener('change', () => {
   $('#btn-redo').disabled = !history.canRedo;
   if (state.doc) {
     refreshLayers();
+    refreshReference();
     if (!restoring) scheduleAutosave();
   }
 });
@@ -681,15 +685,215 @@ $('#btn-fit').addEventListener('click', () => view.fit());
 $('#btn-actual').addEventListener('click', () => view.zoomTo(1));
 
 // ---------------------------------------------------------------------------
+// Reference pictures: search, import, paste, drag-and-drop
+
+const refCard = {
+  empty: $('#ref-empty'),
+  filled: $('#ref-filled'),
+  thumb: $('#ref-thumb'),
+  title: $('#ref-title'),
+  link: $('#ref-link'),
+  visible: $('#ref-visible'),
+  opacity: $('#ref-opacity'),
+  opacityOut: $('#out-ref-opacity'),
+};
+let refThumbFor = null;
+
+function refreshReference() {
+  const ref = state.doc?.reference;
+  refCard.empty.hidden = !!ref;
+  refCard.filled.hidden = !ref;
+  if (!ref) {
+    refThumbFor = null;
+    return;
+  }
+  if (refThumbFor !== ref) {
+    refThumbFor = ref;
+    const t = document.createElement('canvas');
+    const s = Math.min(1, 160 / Math.max(ref.canvas.width, ref.canvas.height));
+    t.width = Math.round(ref.canvas.width * s);
+    t.height = Math.round(ref.canvas.height * s);
+    t.getContext('2d').drawImage(ref.canvas, 0, 0, t.width, t.height);
+    refCard.thumb.src = t.toDataURL('image/jpeg', 0.8);
+  }
+  refCard.title.textContent = ref.title || 'Your picture';
+  refCard.title.title = ref.credit || ref.title || '';
+  const by = [ref.creator && `by ${ref.creator}`, ref.license].filter(Boolean).join(' · ');
+  refCard.link.textContent = ref.landingUrl ? (by || 'View original') : by;
+  if (ref.landingUrl) refCard.link.href = ref.landingUrl;
+  else refCard.link.removeAttribute('href');
+  refCard.visible.checked = ref.visible;
+  refCard.opacity.value = Math.round(ref.opacity * 100);
+  refCard.opacityOut.textContent = `${Math.round(ref.opacity * 100)}%`;
+}
+
+function setReference(next, label) {
+  const doc = state.doc;
+  const prev = doc.reference;
+  doc.reference = next;
+  history.push({
+    label,
+    undo() { doc.reference = prev; },
+    redo() { doc.reference = next; },
+  });
+}
+
+refCard.visible.addEventListener('change', () => {
+  const ref = state.doc.reference;
+  if (!ref) return;
+  ref.visible = refCard.visible.checked;
+  view.requestRender();
+  scheduleAutosave();
+});
+refCard.opacity.addEventListener('input', () => {
+  const ref = state.doc.reference;
+  if (!ref) return;
+  ref.opacity = Number(refCard.opacity.value) / 100;
+  if (ref.opacity > 0 && !ref.visible) {
+    ref.visible = true;
+    refCard.visible.checked = true;
+  }
+  refCard.opacityOut.textContent = `${refCard.opacity.value}%`;
+  view.requestRender();
+});
+refCard.opacity.addEventListener('change', scheduleAutosave);
+$('#ref-remove').addEventListener('click', () => {
+  if (state.doc.reference) setReference(null, 'Remove picture');
+});
+
+const placeDialog = $('#place-dialog');
+
+/** Asks whether to start a new drawing or put the picture behind the current one. */
+function askPlacement(canvas, credit) {
+  $('#place-preview').src = canvas.toDataURL('image/jpeg', 0.85);
+  $('#place-credit').textContent = credit || '';
+  return new Promise((resolve) => {
+    placeDialog.addEventListener('close', () => resolve(placeDialog.returnValue || 'cancel'), { once: true });
+    placeDialog.returnValue = 'cancel';
+    placeDialog.showModal();
+  });
+}
+
+let importing = false;
+
+/**
+ * Brings a picture in as the reference.
+ * @param {{blob?: Blob, url?: string, fallbacks?: string[], meta?: object}} src
+ * @returns {Promise<boolean>} true if a picture was placed
+ */
+async function importPicture(src) {
+  if (importing) return false;
+  importing = true;
+  try {
+    let blob = src.blob;
+    if (!blob && src.url) {
+      toast('Downloading the picture…');
+      blob = await loadImageFromUrl(src.url, src.fallbacks || []);
+    }
+    const canvas = await blobToCanvas(blob);
+    const ref = new Reference(canvas, src.meta || {});
+    if (searchDialog.open) searchDialog.close();
+    const choice = await askPlacement(canvas, ref.credit);
+    if (choice === 'cancel') return false;
+    if (choice === 'new') {
+      const size = canvasSizeFor(canvas.width, canvas.height);
+      const doc = new DrawingDocument(size.w, size.h, '#ffffff');
+      ref.fitTo(size.w, size.h);
+      doc.reference = ref;
+      setDocument(doc);
+    } else {
+      ref.fitTo(state.doc.width, state.doc.height);
+      setReference(ref, 'Add picture');
+    }
+    scheduleAutosave();
+    toast('Picture added. Use the Reference picture panel to fade it in or out.');
+    return true;
+  } catch (err) {
+    toast(err.message);
+    throw err;
+  } finally {
+    importing = false;
+  }
+}
+
+const searchDialog = $('#search-dialog');
+const imageSearch = new ImageSearch({
+  dialog: searchDialog,
+  async onPick(result) {
+    await importPicture({ url: result.url, fallbacks: result.thumbnail ? [result.thumbnail] : [], meta: result.meta });
+  },
+});
+const openSearch = () => imageSearch.open();
+$('#btn-find').addEventListener('click', openSearch);
+$('#ref-find').addEventListener('click', openSearch);
+$('#ref-replace').addEventListener('click', openSearch);
+
+const imageInput = $('#file-image');
+const pickImageFile = () => imageInput.click();
+$('#btn-import').addEventListener('click', pickImageFile);
+$('#ref-import').addEventListener('click', pickImageFile);
+imageInput.addEventListener('change', () => {
+  const file = imageInput.files[0];
+  imageInput.value = '';
+  if (file) importPicture({ blob: file, meta: { title: file.name.replace(/\.[^.]+$/, '') } }).catch(() => {});
+});
+
+async function importFound(found, fallbackTitle) {
+  if (!found) return false;
+  if (found.file) {
+    return importPicture({ blob: found.file, meta: { title: found.file.name && found.file.name !== 'image.png' ? found.file.name.replace(/\.[^.]+$/, '') : fallbackTitle } });
+  }
+  return importPicture({ url: found.url, meta: { title: fallbackTitle } });
+}
+
+document.addEventListener('paste', (e) => {
+  if (isTyping(e.target) || placeDialog.open || newDialog.open) return;
+  const found = findImageIn(e.clipboardData);
+  if (found) {
+    e.preventDefault();
+    importFound(found, 'Pasted picture').catch(() => {});
+  } else {
+    toast('No picture to paste. On a website, right-click a picture and choose Copy image, then press Ctrl+V here.');
+  }
+});
+
+const stage = $('#stage');
+let dragDepth = 0;
+stage.addEventListener('dragenter', (e) => {
+  e.preventDefault();
+  dragDepth += 1;
+  stage.classList.add('dragging');
+});
+stage.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+});
+stage.addEventListener('dragleave', () => {
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) stage.classList.remove('dragging');
+});
+stage.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dragDepth = 0;
+  stage.classList.remove('dragging');
+  const found = findImageIn(e.dataTransfer);
+  if (found) importFound(found, 'Dropped picture').catch(() => {});
+  else toast("That doesn't look like a picture. Try dragging the image itself.");
+});
+// Don't let a drop outside the canvas navigate away from the app.
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => e.preventDefault());
+
+// ---------------------------------------------------------------------------
 // Keyboard
 
 function isTyping(target) {
   return target instanceof HTMLElement &&
-    (target.matches('input[type="text"], input[type="number"], textarea, select') || target.isContentEditable);
+    (target.matches('input[type="text"], input[type="search"], input[type="number"], textarea, select') || target.isContentEditable);
 }
 
 window.addEventListener('keydown', (e) => {
-  if (isTyping(e.target) || newDialog.open) return;
+  if (isTyping(e.target) || newDialog.open || placeDialog.open || searchDialog.open) return;
   const mod = e.ctrlKey || e.metaKey;
   const key = e.key.toLowerCase();
 
@@ -758,4 +962,4 @@ $('#btn-redo').disabled = true;
 })();
 
 // Handy for debugging from the browser console.
-window.drawme = { state, history, view };
+window.drawme = { state, history, view, importPicture };

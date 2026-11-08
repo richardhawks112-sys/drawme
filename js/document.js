@@ -37,6 +37,8 @@ export class DrawingDocument {
     this.layers = [];
     this.activeIndex = 0;
     this._layerCounter = 0;
+    /** The picture being drawn from (a Reference), or null. Never exported. */
+    this.reference = null;
     if (!emptyLayers) this.insertLayer(0, this.createLayer());
   }
 
@@ -71,10 +73,16 @@ export class DrawingDocument {
   }
 
   /** Draws background + visible layers into ctx (in document coordinates). */
-  drawInto(ctx, { background = true } = {}) {
+  drawInto(ctx, { background = true, reference = false } = {}) {
     if (background && this.background) {
       ctx.fillStyle = this.background;
       ctx.fillRect(0, 0, this.width, this.height);
+    }
+    const ref = this.reference;
+    if (reference && ref && ref.visible && ref.opacity > 0) {
+      ctx.globalAlpha = reference === 'full' ? 1 : ref.opacity;
+      ctx.drawImage(ref.canvas, ref.rect.x, ref.rect.y, ref.rect.w, ref.rect.h);
+      ctx.globalAlpha = 1;
     }
     for (const layer of this.layers) {
       if (!layer.visible || layer.opacity <= 0) continue;
@@ -93,7 +101,7 @@ export class DrawingDocument {
     return canvas;
   }
 
-  /** Colour of the flattened image at a document point: [r, g, b, a]. */
+  /** Colour at a document point, with the reference at full strength under the layers: [r, g, b, a]. */
   sampleColor(x, y) {
     if (!this._sampler) {
       this._sampler = document.createElement('canvas');
@@ -107,7 +115,7 @@ export class DrawingDocument {
     ctx.clearRect(0, 0, 1, 1);
     ctx.save();
     ctx.translate(-ix, -iy);
-    this.drawInto(ctx);
+    this.drawInto(ctx, { reference: 'full' });
     ctx.restore();
     return ctx.getImageData(0, 0, 1, 1).data;
   }
