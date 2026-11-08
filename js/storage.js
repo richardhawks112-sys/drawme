@@ -2,6 +2,7 @@
 // (.drawme JSON), and PNG export.
 
 import { DrawingDocument, Layer } from './document.js';
+import { Reference } from './reference.js';
 
 const DB_NAME = 'drawme';
 const STORE = 'kv';
@@ -44,9 +45,25 @@ export async function idbGet(key) {
   }
 }
 
-function canvasToBlob(canvas) {
+function canvasToBlob(canvas, type = 'image/png') {
   return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode image'))), 'image/png'));
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode image'))), type, 0.92));
+}
+
+async function imageToCanvas(image) {
+  let blob = image;
+  if (typeof blob === 'string') {
+    if (!blob.startsWith('data:image/')) throw new Error('The project contains an invalid picture.');
+    blob = await (await fetch(blob)).blob();
+  }
+  if (!(blob instanceof Blob)) return null;
+  const bmp = await createImageBitmap(blob);
+  const canvas = document.createElement('canvas');
+  canvas.width = bmp.width;
+  canvas.height = bmp.height;
+  canvas.getContext('2d').drawImage(bmp, 0, 0);
+  bmp.close?.();
+  return canvas;
 }
 
 function blobToDataURL(blob) {
@@ -73,6 +90,22 @@ export async function serializeDoc(doc, encoding = 'blob') {
       image: encoding === 'dataURL' ? await blobToDataURL(blob) : blob,
     });
   }
+  let reference = null;
+  const ref = doc.reference;
+  if (ref) {
+    const blob = await canvasToBlob(ref.canvas, 'image/jpeg');
+    reference = {
+      title: ref.title,
+      creator: ref.creator,
+      license: ref.license,
+      licenseUrl: ref.licenseUrl,
+      landingUrl: ref.landingUrl,
+      opacity: ref.opacity,
+      visible: ref.visible,
+      rect: ref.rect,
+      image: encoding === 'dataURL' ? await blobToDataURL(blob) : blob,
+    };
+  }
   return {
     format: PROJECT_FORMAT,
     version: 1,
@@ -82,6 +115,7 @@ export async function serializeDoc(doc, encoding = 'blob') {
     activeIndex: doc.activeIndex,
     layerCounter: doc._layerCounter,
     layers,
+    reference,
   };
 }
 
@@ -113,6 +147,25 @@ export async function deserializeDoc(data) {
   if (!doc.layers.length) doc.layers.push(doc.createLayer());
   doc._layerCounter = Math.max(Number(data.layerCounter) || 0, doc.layers.length);
   doc.setActive(Number(data.activeIndex) || 0);
+  if (data.reference && data.reference.image) {
+    const r = data.reference;
+    const canvas = await imageToCanvas(r.image);
+    if (canvas) {
+      const rect = r.rect && ['x', 'y', 'w', 'h'].every((k) => Number.isFinite(r.rect[k]))
+        ? { x: r.rect.x, y: r.rect.y, w: r.rect.w, h: r.rect.h } : null;
+      doc.reference = new Reference(canvas, {
+        title: String(r.title || ''),
+        creator: String(r.creator || ''),
+        license: String(r.license || ''),
+        licenseUrl: /^https?:\/\//.test(r.licenseUrl || '') ? r.licenseUrl : '',
+        landingUrl: /^https?:\/\//.test(r.landingUrl || '') ? r.landingUrl : '',
+        opacity: Math.max(0, Math.min(1, Number(r.opacity ?? 0.5))),
+        visible: r.visible !== false,
+        rect,
+      });
+      if (!rect) doc.reference.fitTo(w, h);
+    }
+  }
   return doc;
 }
 

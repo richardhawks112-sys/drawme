@@ -12,6 +12,10 @@
   <header class="topbar">
     <div class="brand">DrawMe</div>
     <div class="group">
+      <button id="btn-find" class="primary" title="Search for a photo or artwork to draw from">Find photo</button>
+      <button id="btn-import" title="Use a picture from your computer (you can also paste with Ctrl+V or drag one in)">Import picture</button>
+    </div>
+    <div class="group">
       <button id="btn-new" title="Start a new drawing">New</button>
       <button id="btn-open" title="Open a saved .drawme project">Open</button>
       <button id="btn-save" title="Save the project with its layers (Ctrl+S)">Save</button>
@@ -29,6 +33,7 @@
       <button id="btn-actual" title="Actual size (1)">1:1</button>
     </div>
     <input type="file" id="file-open" accept=".drawme,application/json" hidden>
+    <input type="file" id="file-image" accept="image/*" hidden>
   </header>
 
   <main class="layout">
@@ -37,6 +42,7 @@
     <section class="stage" id="stage">
       <canvas id="view" aria-label="Drawing canvas"></canvas>
       <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      <div class="drop-hint" id="drop-hint">Drop the picture to use it</div>
     </section>
 
     <aside class="panel">
@@ -84,6 +90,35 @@
         <p class="opt hint" data-show="hand">Drag to move around. With any tool you can also hold Space and drag, or drag with the middle mouse button. Scroll to zoom.</p>
       </section>
 
+      <section class="card ref-card" id="ref-card">
+        <h2>Reference picture</h2>
+        <div id="ref-empty">
+          <p class="hint">Pick a photo or artwork to draw from. You can also copy a picture on any website (right-click → Copy image) and press <strong>Ctrl+V</strong> here, or drag one onto the canvas.</p>
+          <div class="ref-actions">
+            <button id="ref-find" class="primary">Find photo</button>
+            <button id="ref-import">From my computer</button>
+          </div>
+        </div>
+        <div id="ref-filled" hidden>
+          <div class="ref-head">
+            <img id="ref-thumb" class="ref-thumb" alt="">
+            <div class="ref-info">
+              <div id="ref-title" class="ref-title"></div>
+              <a id="ref-link" class="ref-link" target="_blank" rel="noopener noreferrer"></a>
+            </div>
+          </div>
+          <label class="check"><input type="checkbox" id="ref-visible"> Show picture</label>
+          <label class="range">
+            <span>Opacity</span><input type="range" id="ref-opacity" min="0" max="100"><output id="out-ref-opacity"></output>
+          </label>
+          <div class="ref-actions">
+            <button id="ref-replace">Change</button>
+            <button id="ref-remove" class="danger">Remove</button>
+          </div>
+          <p class="hint">The picture sits behind your layers. It isn't included when you export a PNG, but the color picker can pick colors from it.</p>
+        </div>
+      </section>
+
       <section class="card layers-card">
         <h2>Layers</h2>
         <div id="layer-list" class="layer-list" role="listbox" aria-label="Layers"></div>
@@ -110,6 +145,7 @@
           <dt>Space + drag</dt><dd>Move around</dd>
           <dt>Scroll, + and −</dt><dd>Zoom</dd>
           <dt>0 and 1</dt><dd>Fit to window, actual size</dd>
+          <dt>Ctrl+V</dt><dd>Paste a picture to draw from</dd>
           <dt>Ctrl+S, Ctrl+E</dt><dd>Save project, export PNG</dd>
         </dl>
         <p class="hint">Pen tablet: the eraser end of the pen erases automatically.</p>
@@ -155,6 +191,44 @@
         <button value="ok" class="primary">Create</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="place-dialog" class="place-dialog">
+    <form method="dialog">
+      <h2>Use this picture</h2>
+      <img id="place-preview" class="place-preview" alt="The picture you chose">
+      <p class="hint" id="place-credit"></p>
+      <div class="place-choices">
+        <button value="new" class="primary">Start a new drawing the same shape as the picture</button>
+        <button value="add">Put it behind my current drawing</button>
+        <button value="cancel">Cancel</button>
+      </div>
+      <p class="hint">Starting a new drawing replaces the current one. Use Save first if you want to keep it.</p>
+    </form>
+  </dialog>
+
+  <dialog id="search-dialog" class="search-dialog">
+    <div class="search-head">
+      <h2>Find a photo or artwork</h2>
+      <button id="search-close" type="button" aria-label="Close">✕</button>
+    </div>
+    <form id="search-form" class="search-form">
+      <input type="search" id="search-q" placeholder="Try horse, hands, portrait, flowers…" aria-label="Search for pictures" autocomplete="off">
+      <select id="search-cat" aria-label="Kind of picture">
+        <option value="">Everything</option>
+        <option value="photograph">Photos</option>
+        <option value="illustration">Illustrations</option>
+        <option value="digitized_artwork">Paintings and artwork</option>
+      </select>
+      <button class="primary">Search</button>
+    </form>
+    <p id="search-status" class="hint" role="status">Free-to-use pictures from Openverse.</p>
+    <div id="search-results" class="results-grid"></div>
+    <div class="search-more-row"><button id="search-more" type="button" hidden>Load more</button></div>
+    <p class="hint search-foot">
+      Not finding it? <a id="search-web" target="_blank" rel="noopener noreferrer">Search Google Images</a> in a new tab.
+      Right-click a picture there, choose <strong>Copy image</strong>, then come back and press <strong>Ctrl+V</strong>.
+    </p>
   </dialog>
 
   <script type="module" src="js/app.js"></script>

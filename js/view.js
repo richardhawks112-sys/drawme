@@ -147,6 +147,12 @@ export class Viewport {
 
     ctx.imageSmoothingEnabled = s < 2;
     ctx.imageSmoothingQuality = 'high';
+    const ref = doc.reference;
+    if (ref && ref.visible && ref.opacity > 0) {
+      ctx.globalAlpha = ref.opacity;
+      ctx.drawImage(ref.canvas, ref.rect.x, ref.rect.y, ref.rect.w, ref.rect.h);
+      ctx.globalAlpha = 1;
+    }
     const live = this.liveStroke;
     for (const layer of doc.layers) {
       if (!layer.visible) continue;
