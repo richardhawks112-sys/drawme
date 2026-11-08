@@ -19,7 +19,8 @@ export class Viewport {
     this.cursorRadius = 0;
     /** Extra drawing hooks run after the layers, in document space: fn(ctx, view) */
     this.overlays = [];
-    this.onChange = null;
+    /** Called after every zoom or pan */
+    this.listeners = [];
     this._raf = 0;
     this._compose = document.createElement('canvas');
     this._composeCtx = this._compose.getContext('2d');
@@ -115,7 +116,7 @@ export class Viewport {
 
   _changed() {
     this.requestRender();
-    if (this.onChange) this.onChange();
+    for (const fn of this.listeners) fn();
   }
 
   requestRender() {
@@ -148,11 +149,8 @@ export class Viewport {
     ctx.imageSmoothingEnabled = s < 2;
     ctx.imageSmoothingQuality = 'high';
     const ref = doc.reference;
-    if (ref && ref.visible && ref.opacity > 0) {
-      ctx.globalAlpha = ref.opacity;
-      ctx.drawImage(ref.canvas, ref.rect.x, ref.rect.y, ref.rect.w, ref.rect.h);
-      ctx.globalAlpha = 1;
-    }
+    const showRef = ref && ref.visible && ref.opacity > 0;
+    if (showRef && ref.placement !== 'above') ref.draw(ctx);
     const live = this.liveStroke;
     for (const layer of doc.layers) {
       if (!layer.visible) continue;
@@ -169,6 +167,7 @@ export class Viewport {
       ctx.drawImage(src, 0, 0);
     }
     ctx.globalAlpha = 1;
+    if (showRef && ref.placement === 'above') ref.draw(ctx);
     for (const fn of this.overlays) fn(ctx, this);
 
     // Brush outline, in screen space.

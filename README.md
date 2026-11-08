@@ -5,11 +5,13 @@ A drawing-practice app that runs in your web browser. Draw with a pen tablet
 
 The plan is to let you find a photo or artwork, trace or copy it with
 adjustable overlays and split screen, and then compare your drawing with the
-original. So far you can draw, and bring in a picture to draw from.
+original. So far you can draw, bring in a picture to draw from, and control how
+that picture shows while you draw.
 
 ## What works now
 
 - **Reference pictures:** click **Find photo** to search free-to-use photos and artwork from [Openverse](https://openverse.org). You can also paste any picture with **Ctrl+V** (right-click it on a website and choose *Copy image*), drag one onto the canvas from another tab or a folder, or use **Import picture**. You can start a new drawing the same shape as the picture or put it behind your current drawing, then fade it with the opacity slider. The picture saves with your drawing, it's left out of PNG exports, and the color picker can pick colors from it.
+- **While you draw:** show the picture behind your lines or on top like tracing paper, and set its opacity. The **Outline** slider fades the photo into just its outlines, using edge detection, and you can choose line detail and line color. **Side by side** puts the picture next to your drawing. Both sides zoom and pan together, and a red crosshair on the picture shows where your pen is. Press **R** to show or hide the picture, and **S** for side by side.
 - **Tools:** pen, pencil, marker, airbrush, eraser, fill bucket, color picker, and a move tool.
 - **Pen tablets:** pressure changes size and/or opacity, with a "feel" setting for a soft or firm touch. The eraser end of the pen erases, and the side button picks a color.
 - **Smoothing** steadies shaky lines.
@@ -59,6 +61,8 @@ the app is live at `https://<your-username>.github.io/drawme/`.
 | `js/layers-panel.js` | The layers list |
 | `js/reference.js` | Loading reference pictures from files, the clipboard, drops and the web |
 | `js/search.js` | The Openverse picture search |
+| `js/outline.js` | Turns a picture into outlines (edge detection) |
+| `js/ref-pane.js` | The picture half of side-by-side view |
 
 Some websites don't let other pages download their pictures directly. In that case
 DrawMe fetches the picture through the free [images.weserv.nl](https://images.weserv.nl)

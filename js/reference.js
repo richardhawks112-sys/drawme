@@ -1,6 +1,8 @@
 // Reference pictures: loading them from files, the clipboard, drag-and-drop,
 // or the web, and keeping track of where they sit on the canvas.
 
+import { edgeStrength, renderOutline } from './outline.js';
+
 const MAX_SIDE = 2048;
 const PROXY = 'https://images.weserv.nl/?url=';
 
@@ -18,12 +20,54 @@ export class Reference {
     this.landingUrl = meta.landingUrl || '';
     this.opacity = meta.opacity ?? 0.5;
     this.visible = meta.visible ?? true;
+    /** 'behind' the layers, or 'above' them like tracing paper */
+    this.placement = meta.placement === 'above' ? 'above' : 'behind';
+    /** 0 = the full picture, 1 = outlines only */
+    this.outline = clamp01(meta.outline ?? 0);
+    /** How many lines the outline shows, 0..1 */
+    this.detail = clamp01(meta.detail ?? 0.5);
+    this.lineColor = /^#[0-9a-f]{6}$/i.test(meta.lineColor || '') ? meta.lineColor : '#202020';
+    this._edges = null;
+    this._outline = null;
+    this._outlineKey = '';
     /** Where the picture is drawn, in document pixels */
     this.rect = meta.rect || { x: 0, y: 0, w: canvas.width, h: canvas.height };
   }
 
   fitTo(docW, docH) {
     this.rect = fitRect(this.canvas.width, this.canvas.height, docW, docH);
+  }
+
+  /** The outline version of the picture (cached). */
+  getOutline() {
+    if (!this._edges) this._edges = edgeStrength(this.canvas);
+    const key = `${this.detail.toFixed(3)}|${this.lineColor}`;
+    if (!this._outline || this._outlineKey !== key) {
+      this._outline = renderOutline(this._edges, this.detail, this.lineColor);
+      this._outlineKey = key;
+    }
+    return this._outline;
+  }
+
+  /**
+   * Draws the picture, blended between photo and outline.
+   * @param {CanvasRenderingContext2D} ctx  in document coordinates
+   * @param {number} alpha  overall opacity
+   */
+  draw(ctx, alpha = this.opacity) {
+    const { x, y, w, h } = this.rect;
+    const photoAlpha = alpha * (1 - this.outline);
+    const lineAlpha = alpha * Math.min(1, this.outline * 2);
+    const prev = ctx.globalAlpha;
+    if (photoAlpha > 0.003) {
+      ctx.globalAlpha = photoAlpha;
+      ctx.drawImage(this.canvas, x, y, w, h);
+    }
+    if (lineAlpha > 0.003) {
+      ctx.globalAlpha = lineAlpha;
+      ctx.drawImage(this.getOutline(), x, y, w, h);
+    }
+    ctx.globalAlpha = prev;
   }
 
   get credit() {
@@ -33,6 +77,11 @@ export class Reference {
     if (this.license) parts.push(`(${this.license})`);
     return parts.join(' ');
   }
+}
+
+function clamp01(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0;
 }
 
 /** Largest rectangle with the picture's shape that fits inside the document, centred. */

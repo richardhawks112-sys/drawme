@@ -8,6 +8,7 @@ import { LayersPanel } from './layers-panel.js';
 import * as storage from './storage.js';
 import { Reference, blobToCanvas, canvasSizeFor, findImageIn, loadImageFromUrl } from './reference.js';
 import { ImageSearch } from './search.js';
+import { ReferencePane } from './ref-pane.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -25,7 +26,7 @@ const state = {
   doc: null,
   tool: 'pen',
   color: '#222222',
-  shared: { stabilizer: 2, pressureCurve: 0, tolerance: 15, grow: 1 },
+  shared: { stabilizer: 2, pressureCurve: 0, tolerance: 15, grow: 1, split: false },
   tools: {},
 };
 for (const id of TOOL_ORDER) {
@@ -36,6 +37,7 @@ loadSettings();
 const history = new History();
 const viewCanvas = $('#view');
 const view = new Viewport(viewCanvas);
+const refPane = new ReferencePane($('#refview'), view);
 const layersPanel = new LayersPanel($('#layer-list'), {
   onSelect(i) {
     state.doc.setActive(i);
@@ -404,6 +406,7 @@ viewCanvas.addEventListener('pointerdown', (e) => {
 
 viewCanvas.addEventListener('pointermove', (e) => {
   view.cursor = view.toLocal(e.clientX, e.clientY);
+  if (refPane.active) refPane.setGhost(view.toDoc(e.clientX, e.clientY));
   if (e.pointerType === 'pen') noteInput(e);
   if (!drag || e.pointerId !== drag.id) {
     view.requestRender();
@@ -460,6 +463,7 @@ viewCanvas.addEventListener('pointercancel', (e) => endDrag(e, false));
 viewCanvas.addEventListener('lostpointercapture', (e) => endDrag(e, true));
 viewCanvas.addEventListener('pointerleave', () => {
   view.cursor = null;
+  refPane.setGhost(null);
   view.requestRender();
 });
 viewCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -677,7 +681,7 @@ newDialog.addEventListener('close', () => {
 });
 
 const zoomLabel = $('#zoom-label');
-view.onChange = () => { zoomLabel.textContent = `${Math.round(view.scale * 100)}%`; };
+view.listeners.push(() => { zoomLabel.textContent = `${Math.round(view.scale * 100)}%`; });
 const zoomStep = (f) => view.zoomBy(f);
 $('#btn-zoom-in').addEventListener('click', () => zoomStep(1.25));
 $('#btn-zoom-out').addEventListener('click', () => zoomStep(0.8));
@@ -696,6 +700,16 @@ const refCard = {
   visible: $('#ref-visible'),
   opacity: $('#ref-opacity'),
   opacityOut: $('#out-ref-opacity'),
+  modeOverlay: $('#ref-mode-overlay'),
+  modeSplit: $('#ref-mode-split'),
+  behind: $('#ref-behind'),
+  above: $('#ref-above'),
+  outline: $('#ref-outline'),
+  outlineOut: $('#out-ref-outline'),
+  detail: $('#ref-detail'),
+  detailOut: $('#out-ref-detail'),
+  lineOpts: $('#ref-line-opts'),
+  lineColors: [...document.querySelectorAll('[data-line]')],
 };
 let refThumbFor = null;
 
@@ -705,6 +719,10 @@ function refreshReference() {
   refCard.filled.hidden = !ref;
   if (!ref) {
     refThumbFor = null;
+    if (state.shared.split) {
+      state.shared.split = false;
+      applySplit();
+    }
     return;
   }
   if (refThumbFor !== ref) {
@@ -725,6 +743,66 @@ function refreshReference() {
   refCard.visible.checked = ref.visible;
   refCard.opacity.value = Math.round(ref.opacity * 100);
   refCard.opacityOut.textContent = `${Math.round(ref.opacity * 100)}%`;
+  refCard.behind.setAttribute('aria-pressed', String(ref.placement !== 'above'));
+  refCard.above.setAttribute('aria-pressed', String(ref.placement === 'above'));
+  refCard.outline.value = Math.round(ref.outline * 100);
+  refCard.outlineOut.textContent = outlineLabel(ref.outline);
+  refCard.detail.value = Math.round(ref.detail * 100);
+  refCard.detailOut.textContent = `${Math.round(ref.detail * 100)}%`;
+  refCard.lineOpts.hidden = ref.outline <= 0;
+  for (const b of refCard.lineColors) b.classList.toggle('current', b.dataset.line === ref.lineColor);
+  refPane.requestRender();
+}
+
+function outlineLabel(v) {
+  if (v <= 0) return 'Photo';
+  if (v >= 1) return 'Lines';
+  return `${Math.round(v * 100)}%`;
+}
+
+// ---- Split screen: the picture on the left, the drawing on the right.
+
+const stageEl = $('#stage');
+const refPaneEl = $('#ref-pane');
+
+function applySplit() {
+  const on = state.shared.split;
+  stageEl.classList.toggle('split', on);
+  refPaneEl.hidden = !on;
+  refCard.modeOverlay.setAttribute('aria-pressed', String(!on));
+  refCard.modeSplit.setAttribute('aria-pressed', String(on));
+  if (on) refPane.resize();
+}
+
+function setSplit(on) {
+  if (on && !state.doc.reference) {
+    toast('Add a picture first, then you can show it side by side.');
+    return;
+  }
+  state.shared.split = on;
+  const ref = state.doc.reference;
+  // Side by side usually means drawing without the picture underneath,
+  // so hide it on the drawing (and bring it back when leaving).
+  if (ref) {
+    if (on && ref.visible) { ref.visible = false; ref._hiddenForSplit = true; }
+    else if (!on && ref._hiddenForSplit) { ref.visible = true; }
+    if (!on) ref._hiddenForSplit = false;
+  }
+  applySplit();
+  refreshReference();
+  view.requestRender();
+  saveSettings();
+  scheduleAutosave();
+}
+
+function toggleReferenceVisible() {
+  const ref = state.doc.reference;
+  if (!ref) return;
+  ref.visible = !ref.visible;
+  ref._hiddenForSplit = false;
+  refreshReference();
+  view.requestRender();
+  scheduleAutosave();
 }
 
 function setReference(next, label) {
@@ -757,6 +835,48 @@ refCard.opacity.addEventListener('input', () => {
   view.requestRender();
 });
 refCard.opacity.addEventListener('change', scheduleAutosave);
+
+refCard.modeOverlay.addEventListener('click', () => setSplit(false));
+refCard.modeSplit.addEventListener('click', () => setSplit(true));
+
+function setPlacement(placement) {
+  const ref = state.doc.reference;
+  if (!ref) return;
+  ref.placement = placement;
+  if (!ref.visible) { ref.visible = true; ref._hiddenForSplit = false; }
+  refreshReference();
+  view.requestRender();
+  scheduleAutosave();
+}
+refCard.behind.addEventListener('click', () => setPlacement('behind'));
+refCard.above.addEventListener('click', () => setPlacement('above'));
+
+let outlineTimer = 0;
+function updateOutline(apply) {
+  const ref = state.doc.reference;
+  if (!ref) return;
+  apply(ref);
+  refCard.outlineOut.textContent = outlineLabel(ref.outline);
+  refCard.detailOut.textContent = `${Math.round(ref.detail * 100)}%`;
+  refCard.lineOpts.hidden = ref.outline <= 0;
+  // Building the outline takes a moment on big pictures, so coalesce slider moves.
+  cancelAnimationFrame(outlineTimer);
+  outlineTimer = requestAnimationFrame(() => {
+    view.requestRender();
+    refPane.requestRender();
+  });
+}
+refCard.outline.addEventListener('input', () => updateOutline((ref) => { ref.outline = Number(refCard.outline.value) / 100; }));
+refCard.detail.addEventListener('input', () => updateOutline((ref) => { ref.detail = Number(refCard.detail.value) / 100; }));
+refCard.outline.addEventListener('change', scheduleAutosave);
+refCard.detail.addEventListener('change', scheduleAutosave);
+for (const b of refCard.lineColors) {
+  b.addEventListener('click', () => {
+    updateOutline((ref) => { ref.lineColor = b.dataset.line; });
+    refreshReference();
+    scheduleAutosave();
+  });
+}
 $('#ref-remove').addEventListener('click', () => {
   if (state.doc.reference) setReference(null, 'Remove picture');
 });
@@ -926,6 +1046,8 @@ window.addEventListener('keydown', (e) => {
   if (key === '1') { view.zoomTo(1); return; }
   if (key === '+' || key === '=') { zoomStep(1.25); return; }
   if (key === '-' || key === '_') { zoomStep(0.8); return; }
+  if (key === 'r') { toggleReferenceVisible(); return; }
+  if (key === 's') { setSplit(!state.shared.split); return; }
   const tool = TOOL_ORDER.find((id) => TOOLS[id].key === key);
   if (tool) selectTool(tool);
 });
@@ -958,6 +1080,7 @@ $('#btn-redo').disabled = true;
     console.warn('Could not restore the last drawing', err);
   }
   setDocument(doc || new DrawingDocument(1600, 1200, '#ffffff'));
+  applySplit();
   setSaveStatus(doc ? 'Restored your last drawing' : 'Your work saves automatically in this browser');
 })();
 
