@@ -103,6 +103,10 @@ export async function serializeDoc(doc, encoding = 'blob') {
       opacity: ref.opacity,
       visible: ref.visible,
       rect: ref.rect,
+      placement: ref.placement,
+      outline: ref.outline,
+      detail: ref.detail,
+      lineColor: ref.lineColor,
       image: encoding === 'dataURL' ? await blobToDataURL(blob) : blob,
     };
   }
@@ -162,6 +166,10 @@ export async function deserializeDoc(data) {
         opacity: Math.max(0, Math.min(1, Number(r.opacity ?? 0.5))),
         visible: r.visible !== false,
         rect,
+        placement: r.placement,
+        outline: r.outline,
+        detail: r.detail,
+        lineColor: typeof r.lineColor === 'string' ? r.lineColor : undefined,
       });
       if (!rect) doc.reference.fitTo(w, h);
     }

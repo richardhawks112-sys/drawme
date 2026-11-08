@@ -40,7 +40,13 @@
     <nav class="toolbar" id="toolbar" aria-label="Tools"></nav>
 
     <section class="stage" id="stage">
-      <canvas id="view" aria-label="Drawing canvas"></canvas>
+      <div class="pane ref-pane" id="ref-pane" hidden>
+        <canvas id="refview" aria-label="Reference picture"></canvas>
+        <span class="pane-label">Reference</span>
+      </div>
+      <div class="pane draw-pane" id="draw-pane">
+        <canvas id="view" aria-label="Drawing canvas"></canvas>
+      </div>
       <div class="toast" id="toast" role="status" aria-live="polite"></div>
       <div class="drop-hint" id="drop-hint">Drop the picture to use it</div>
     </section>
@@ -107,15 +113,40 @@
               <a id="ref-link" class="ref-link" target="_blank" rel="noopener noreferrer"></a>
             </div>
           </div>
-          <label class="check"><input type="checkbox" id="ref-visible"> Show picture</label>
-          <label class="range">
-            <span>Opacity</span><input type="range" id="ref-opacity" min="0" max="100"><output id="out-ref-opacity"></output>
+          <div class="seg" role="group" aria-label="Where to show the picture">
+            <button type="button" id="ref-mode-overlay" aria-pressed="true" title="Show the picture on the drawing itself">On the drawing</button>
+            <button type="button" id="ref-mode-split" aria-pressed="false" title="Show the picture next to the drawing (S)">Side by side</button>
+          </div>
+          <div id="ref-overlay-opts">
+            <label class="check"><input type="checkbox" id="ref-visible"> Show on the drawing <span class="kbd">R</span></label>
+            <div class="seg small" role="group" aria-label="Picture position">
+              <button type="button" id="ref-behind" aria-pressed="true" title="The picture is under your strokes">Behind my lines</button>
+              <button type="button" id="ref-above" aria-pressed="false" title="The picture lies over your strokes, like tracing paper">On top</button>
+            </div>
+            <label class="range">
+              <span>Opacity</span><input type="range" id="ref-opacity" min="0" max="100"><output id="out-ref-opacity"></output>
+            </label>
+          </div>
+          <label class="range" title="Slide right to fade the photo into just its outlines.">
+            <span>Outline</span><input type="range" id="ref-outline" min="0" max="100"><output id="out-ref-outline"></output>
           </label>
+          <div id="ref-line-opts">
+            <label class="range" title="How many lines to show. Lower keeps only the main shapes.">
+              <span>Line detail</span><input type="range" id="ref-detail" min="0" max="100"><output id="out-ref-detail"></output>
+            </label>
+            <div class="line-colors" role="group" aria-label="Line color">
+              <span>Line color</span>
+              <button type="button" class="swatch" data-line="#202020" style="background:#202020" aria-label="Dark lines"></button>
+              <button type="button" class="swatch" data-line="#1e88e5" style="background:#1e88e5" aria-label="Blue lines"></button>
+              <button type="button" class="swatch" data-line="#e53935" style="background:#e53935" aria-label="Red lines"></button>
+              <button type="button" class="swatch" data-line="#8e24aa" style="background:#8e24aa" aria-label="Purple lines"></button>
+            </div>
+          </div>
           <div class="ref-actions">
             <button id="ref-replace">Change</button>
             <button id="ref-remove" class="danger">Remove</button>
           </div>
-          <p class="hint">The picture sits behind your layers. It isn't included when you export a PNG, but the color picker can pick colors from it.</p>
+          <p class="hint">The picture is never included when you export a PNG. The color picker can pick colors from it.</p>
         </div>
       </section>
 
@@ -146,6 +177,8 @@
           <dt>Scroll, + and −</dt><dd>Zoom</dd>
           <dt>0 and 1</dt><dd>Fit to window, actual size</dd>
           <dt>Ctrl+V</dt><dd>Paste a picture to draw from</dd>
+          <dt>R</dt><dd>Show or hide the picture on the drawing</dd>
+          <dt>S</dt><dd>Side by side on or off</dd>
           <dt>Ctrl+S, Ctrl+E</dt><dd>Save project, export PNG</dd>
         </dl>
         <p class="hint">Pen tablet: the eraser end of the pen erases automatically.</p>
