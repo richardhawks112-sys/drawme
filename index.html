@@ -252,9 +252,21 @@
         <option value="photograph">Photos</option>
         <option value="illustration">Illustrations</option>
         <option value="digitized_artwork">Paintings and artwork</option>
+        <option value="anime">Anime and manga</option>
       </select>
       <button class="primary">Search</button>
     </form>
+    <div id="search-ideas" class="search-ideas" hidden>
+      <span class="hint">Ideas:</span>
+      <button type="button" data-q="anime character">Characters</button>
+      <button type="button" data-q="chibi">Chibi</button>
+      <button type="button" data-q="anime eyes">Eyes</button>
+      <button type="button" data-q="anime face">Faces</button>
+      <button type="button" data-q="anime hair">Hair</button>
+      <button type="button" data-q="manga drawing">Manga</button>
+      <button type="button" data-q="kawaii">Kawaii</button>
+      <button type="button" data-q="anime cat">Animals</button>
+    </div>
     <p id="search-status" class="hint" role="status">Free-to-use pictures from Openverse.</p>
     <div id="search-results" class="results-grid"></div>
     <div class="search-more-row"><button id="search-more" type="button" hidden>Load more</button></div>
