@@ -6,7 +6,7 @@
   <title>DrawMe</title>
   <meta name="description" content="Practice drawing with a pen tablet, right in your browser.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%236c8cff'/%3E%3Cpath d='M6 18l1-4 8-8 3 3-8 8z' fill='white'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="css/style.css?v=4">
+  <link rel="stylesheet" href="css/style.css?v=5">
 </head>
 <body>
   <header class="topbar">
@@ -20,6 +20,7 @@
       <button id="btn-open" title="Open a saved .drawme project">Open</button>
       <button id="btn-save" title="Save the project with its layers (Ctrl+S)">Save</button>
       <button id="btn-export" title="Download the drawing as a PNG image (Ctrl+E)">Export PNG</button>
+      <button id="btn-drive" title="Save your drawings to your Google Drive, and open them again on any computer">Google Drive</button>
     </div>
     <div class="group">
       <button id="btn-undo" title="Undo (Ctrl+Z)">Undo</button>
@@ -190,6 +191,7 @@
     <span id="status-input">Draw with your pen, mouse, or finger.</span>
     <span id="status-doc"></span>
     <span id="status-save"></span>
+    <button type="button" id="status-drive" class="status-link" hidden></button>
   </footer>
 
   <dialog id="new-dialog">
@@ -264,6 +266,34 @@
     </p>
   </dialog>
 
-  <script type="module" src="js/app.js?v=4"></script>
+  <dialog id="drive-dialog" class="drive-dialog">
+    <div class="search-head">
+      <h2>Google Drive</h2>
+      <button id="drive-close" type="button" aria-label="Close">✕</button>
+    </div>
+    <div id="drive-off">
+      <p>Saving to Google Drive isn't switched on for this copy of DrawMe yet.</p>
+      <p class="hint">Your work still saves automatically in this browser, and Save downloads a project file.</p>
+    </div>
+    <div id="drive-signin" hidden>
+      <p>Keep your drawings in your own Google Drive, so they're safe and you can open them on any computer.</p>
+      <p class="hint">DrawMe can only see the files it saves there, nothing else in your Drive. They go in a folder called DrawMe.</p>
+      <div class="dialog-actions"><button id="drive-connect" type="button" class="primary">Connect Google Drive</button></div>
+    </div>
+    <div id="drive-on" hidden>
+      <label class="field"><span>Name of this drawing</span><input type="text" id="drive-name" maxlength="100" autocomplete="off"></label>
+      <label class="check drive-auto"><input type="checkbox" id="drive-auto"> Keep saving to Drive as I draw</label>
+      <div class="dialog-actions">
+        <button id="drive-disconnect" type="button">Disconnect</button>
+        <button id="drive-save" type="button" class="primary">Save to Drive now</button>
+      </div>
+      <p class="hint" id="drive-status" role="status"></p>
+      <h3 class="drive-list-title">Your drawings in Drive</h3>
+      <div id="drive-files" class="drive-files"></div>
+      <p class="hint">Opening one replaces the drawing on screen. If that one isn't saved to Drive, use Save first to keep it.</p>
+    </div>
+  </dialog>
+
+  <script type="module" src="js/app.js?v=5"></script>
 </body>
 </html>

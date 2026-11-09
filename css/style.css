@@ -406,3 +406,58 @@ dialog h2 { margin: 0 0 4px; font-size: 16px; }
   .stage.split { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
   .ref-pane { border-right: 0; border-bottom: 2px solid var(--border); }
 }
+
+/* Hover descriptions (js/tooltip.js) */
+.tip {
+  position: fixed;
+  inset: auto;
+  left: 0;
+  top: 0;
+  margin: 0;
+  z-index: 1000;
+  max-width: 280px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #0f1013;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.08s;
+  overflow: visible;
+}
+.tip:not([popover]):not(.show) { display: none; }
+.tip.show { opacity: 1; }
+
+/* Google Drive */
+.status-link {
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.status-link:hover { color: var(--text); }
+.status-link.attention { color: #ffcf66; text-decoration: underline; }
+.drive-dialog { width: min(460px, calc(100vw - 32px)); }
+.drive-dialog p { margin: 10px 0 0; }
+.drive-auto { margin-top: 12px; }
+.drive-list-title { font-size: 13px; margin: 16px 0 6px; font-weight: 600; }
+.drive-files { display: grid; gap: 4px; max-height: 260px; overflow-y: auto; }
+.drive-file {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.drive-file.current { border-color: var(--accent); background: var(--accent-soft); }
+.drive-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drive-file-when { color: var(--muted); font-size: 12px; }
+.drive-file button { padding: 3px 10px; }

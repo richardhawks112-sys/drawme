@@ -9,6 +9,10 @@ import * as storage from './storage.js';
 import { Reference, blobToCanvas, canvasSizeFor, findImageIn, loadImageFromUrl } from './reference.js';
 import { ImageSearch } from './search.js';
 import { ReferencePane } from './ref-pane.js';
+import { setupDrive } from './drive-ui.js';
+import { installTooltips } from './tooltip.js';
+
+installTooltips();
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -120,8 +124,14 @@ function setSaveStatus(text) {
 
 let restoring = false;
 
-function setDocument(doc) {
+/**
+ * @param {object} [opts]
+ * @param {{id: string, name: string}|null} [opts.driveFile]  the Google Drive file it came from
+ * @param {boolean} [opts.keepDrive]  keep saving to the same Drive file (restoring after a reload)
+ */
+function setDocument(doc, { driveFile = null, keepDrive = false } = {}) {
   state.doc = doc;
+  if (!keepDrive) driveSync?.docReplaced(driveFile);
   restoring = true;
   history.clear();
   restoring = false;
@@ -176,6 +186,7 @@ async function autosaveNow() {
     const data = await storage.serializeDoc(state.doc, 'blob');
     await storage.idbSet(AUTOSAVE_KEY, data);
     setSaveStatus('Saved in this browser');
+    driveSync?.docChanged();
   } catch (err) {
     console.warn('Autosave failed', err);
     setSaveStatus('Autosave is not available here. Use Save to keep your work.');
@@ -184,6 +195,20 @@ async function autosaveNow() {
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') autosaveNow();
+});
+window.addEventListener('pagehide', () => autosaveNow());
+
+// ---------------------------------------------------------------------------
+// Google Drive (optional; see js/config.js)
+
+const driveSync = setupDrive({
+  getDoc: () => state.doc,
+  hasEdits: () => history.canUndo || Boolean(state.doc?.reference),
+  openDoc(doc, file) {
+    setDocument(doc, { driveFile: file });
+    scheduleAutosave();
+  },
+  toast: (msg) => toast(msg),
 });
 
 // ---------------------------------------------------------------------------
@@ -1013,7 +1038,7 @@ function isTyping(target) {
 }
 
 window.addEventListener('keydown', (e) => {
-  if (isTyping(e.target) || newDialog.open || placeDialog.open || searchDialog.open) return;
+  if (isTyping(e.target) || document.querySelector('dialog[open]')) return;
   const mod = e.ctrlKey || e.metaKey;
   const key = e.key.toLowerCase();
 
@@ -1079,7 +1104,7 @@ $('#btn-redo').disabled = true;
   } catch (err) {
     console.warn('Could not restore the last drawing', err);
   }
-  setDocument(doc || new DrawingDocument(1600, 1200, '#ffffff'));
+  setDocument(doc || new DrawingDocument(1600, 1200, '#ffffff'), { keepDrive: Boolean(doc) });
   applySplit();
   setSaveStatus(doc ? 'Restored your last drawing' : 'Your work saves automatically in this browser');
 })();
