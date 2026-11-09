@@ -199,8 +199,25 @@ export async function exportPNG(doc) {
   downloadBlob(blob, `drawing-${timestamp()}.png`);
 }
 
-export async function saveProjectFile(doc) {
+/** The whole project as a .drawme file (JSON). */
+export async function projectBlob(doc) {
   const data = await serializeDoc(doc, 'dataURL');
-  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-  downloadBlob(blob, `drawing-${timestamp()}.drawme`);
+  return new Blob([JSON.stringify(data)], { type: 'application/json' });
+}
+
+export async function saveProjectFile(doc) {
+  downloadBlob(await projectBlob(doc), `drawing-${timestamp()}.drawme`);
+}
+
+/** A small PNG preview as URL-safe base64, for Google Drive's file list. */
+export function thumbnailBase64(doc, max = 320) {
+  const flat = doc.flatten({ background: true });
+  const k = Math.min(1, max / Math.max(flat.width, flat.height));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(flat.width * k));
+  c.height = Math.max(1, Math.round(flat.height * k));
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(flat, 0, 0, c.width, c.height);
+  return c.toDataURL('image/png').split(',')[1].replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }

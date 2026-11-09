@@ -17,7 +17,9 @@ that picture shows while you draw.
 - **Smoothing** steadies shaky lines.
 - **Layers:** add, copy, reorder, hide, rename (double-click), opacity, merge down, and clear.
 - **Undo and redo** for every stroke and layer change.
-- **Saving:** your drawing saves automatically in your browser. **Save** downloads a `.drawme` project file with its layers, **Open** loads one back, and **Export PNG** downloads a picture.
+- **Saving:** your drawing saves automatically in your browser a moment after each change. **Save** downloads a `.drawme` project file with its layers, **Open** loads one back, and **Export PNG** downloads a picture.
+- **Google Drive:** click **Google Drive** to connect your own Drive. Drawings save into a **DrawMe** folder there, and keep saving as you draw. You can open them again from any computer. DrawMe can only see the files it made, nothing else in your Drive. After you reload the page, click **Google Drive: click to reconnect** in the status bar to carry on.
+- **Hover descriptions:** rest the pointer on a button for half a second to see what it does.
 - **Zoom and pan:** scroll to zoom. Hold Space and drag, or middle-drag, to move around.
 
 ## Using a pen tablet on Windows
@@ -46,6 +48,23 @@ In the repository go to **Settings → Pages**. Under "Build and deployment" cho
 **Deploy from a branch**, then pick `main` and `/ (root)` and save. After a minute
 the app is live at `https://<your-username>.github.io/drawme/`.
 
+## Turning on Google Drive saving
+
+Google only lets a website use Drive if it has its own OAuth client ID. It's free,
+and the ID is not a secret.
+
+1. Go to https://console.cloud.google.com and create a project (any name, e.g. "DrawMe").
+2. **APIs & Services → Library**: search for **Google Drive API** and click **Enable**.
+3. **APIs & Services → OAuth consent screen** (also called **Google Auth Platform**):
+   choose **External**, enter the app name and your email, and save. Under **Data access**
+   add the scope `.../auth/drive.file`. Under **Audience**, either add each family member's
+   Google address as a test user, or click **Publish app** so anyone can use it.
+4. **APIs & Services → Credentials → Create credentials → OAuth client ID**:
+   type **Web application**, and under **Authorized JavaScript origins** add
+   `https://<your-username>.github.io` (and `http://localhost:8000` for testing).
+5. Copy the client ID (it ends in `.apps.googleusercontent.com`) into
+   `GOOGLE_CLIENT_ID` in `js/config.js`.
+
 ## Code layout
 
 | File | What it does |
@@ -58,6 +77,9 @@ the app is live at `https://<your-username>.github.io/drawme/`.
 | `js/history.js` | Undo and redo |
 | `js/fill.js` | Fill bucket |
 | `js/storage.js` | Autosave, project files, PNG export |
+| `js/config.js` | The Google OAuth client ID for Drive saving |
+| `js/drive.js`, `js/drive-ui.js` | Google Drive sign-in, saving and opening, and its dialog |
+| `js/tooltip.js` | Hover descriptions |
 | `js/layers-panel.js` | The layers list |
 | `js/reference.js` | Loading reference pictures from files, the clipboard, drops and the web |
 | `js/search.js` | The Openverse picture search |
