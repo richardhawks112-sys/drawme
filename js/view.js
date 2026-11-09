@@ -44,6 +44,8 @@ export class Viewport {
   resize() {
     const rect = this.canvas.parentElement.getBoundingClientRect();
     const first = this.width === 0;
+    const oldW = this.width;
+    const oldH = this.height;
     this.dpr = window.devicePixelRatio || 1;
     this.width = rect.width;
     this.height = rect.height;
@@ -53,7 +55,16 @@ export class Viewport {
     this.canvas.style.height = `${rect.height}px`;
     this._rect = this.canvas.getBoundingClientRect();
     // Keep the drawing fitted to the window until the user zooms or pans.
-    if ((first || !this.userMoved) && this.doc) this.fit();
+    if ((first || !this.userMoved) && this.doc) {
+      this.fit();
+    } else if (this.doc && rect.width > 0 && rect.height > 0 && oldW > 0 && oldH > 0) {
+      // The user has zoomed or panned: keep the same spot in the middle of the
+      // view (e.g. when side by side halves the width), and never lose the paper.
+      this.x += (rect.width - oldW) / 2;
+      this.y += (rect.height - oldH) / 2;
+      this._keepVisible();
+      this._changed();
+    }
     this.requestRender();
   }
 
@@ -95,7 +106,19 @@ export class Viewport {
     this.x += dx;
     this.y += dy;
     this.userMoved = true;
+    this._keepVisible();
     this._changed();
+  }
+
+  /** Keeps at least a strip of the paper on screen so it can't get lost. */
+  _keepVisible() {
+    if (!this.doc || !this.width) return;
+    const w = this.doc.width * this.scale;
+    const h = this.doc.height * this.scale;
+    const mx = Math.min(48, w, this.width / 2);
+    const my = Math.min(48, h, this.height / 2);
+    this.x = Math.min(this.width - mx, Math.max(mx - w, this.x));
+    this.y = Math.min(this.height - my, Math.max(my - h, this.y));
   }
 
   /** Client (page) coordinates to document coordinates. */

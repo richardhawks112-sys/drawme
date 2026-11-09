@@ -1,7 +1,7 @@
 import { DrawingDocument } from './document.js';
 import { History, recordPixels } from './history.js';
 import { TOOLS, TOOL_ORDER, Stroke } from './brushes.js';
-import { Viewport } from './view.js';
+import { Viewport } from './view.js?v=6';
 import { floodFill, growRegion, regionToCanvas } from './fill.js';
 import { ICONS } from './icons.js';
 import { LayersPanel } from './layers-panel.js';
@@ -750,6 +750,13 @@ function refreshReference() {
     }
     return;
   }
+  // A picture hidden only because of side by side comes back once that is off
+  // (e.g. after undo or redo brings it back while side by side is off).
+  if (!state.shared.split && ref._hiddenForSplit) {
+    ref.visible = true;
+    ref._hiddenForSplit = false;
+    view.requestRender();
+  }
   if (refThumbFor !== ref) {
     refThumbFor = ref;
     const t = document.createElement('canvas');
@@ -813,6 +820,9 @@ function setSplit(on) {
     else if (!on && ref._hiddenForSplit) { ref.visible = true; }
     if (!on) ref._hiddenForSplit = false;
   }
+  // The drawing area changes size, so re-fit it (the resize does the fitting)
+  // and both halves start out lined up with the whole picture in view.
+  view.userMoved = false;
   applySplit();
   refreshReference();
   view.requestRender();
@@ -940,6 +950,8 @@ async function importPicture(src) {
     if (searchDialog.open) searchDialog.close();
     const choice = await askPlacement(canvas, ref.credit);
     if (choice === 'cancel') return false;
+    // Side by side is on: show the new picture next to the drawing, not on it too.
+    if (state.shared.split) { ref.visible = false; ref._hiddenForSplit = true; }
     if (choice === 'new') {
       const size = canvasSizeFor(canvas.width, canvas.height);
       const doc = new DrawingDocument(size.w, size.h, '#ffffff');
