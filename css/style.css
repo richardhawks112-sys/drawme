@@ -375,6 +375,9 @@ dialog h2 { margin: 0 0 4px; font-size: 16px; }
   place-items: center;
   background: rgba(0, 0, 0, 0.6);
 }
+.search-ideas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.search-ideas[hidden] { display: none; }
+.search-ideas button { padding: 3px 10px; border-radius: 999px; font-size: 0.9em; }
 .search-more-row { display: flex; justify-content: center; }
 .search-more-row button { margin-top: 6px; }
 .search-foot a { color: var(--accent); }
